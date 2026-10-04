@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>排球記錄表</title>
+<style>
+:root{color-scheme:light;--line:#222;--alt:#f4f4f4;--blue:#cfe0f5;--yellow:#fdf0cc;--orange:#fbdcc3;--head:#ececec;--red:#d33;--green:#1a8a3a}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:-apple-system,"PingFang TC","Noto Sans TC",sans-serif;background:#fff;color:#111}
+.app{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;border-bottom:1px solid #ddd;position:sticky;top:0;background:#fff;z-index:5}
+.app a{color:#111;text-decoration:none;font-weight:700;font-size:17px}
+#sync{font-size:13px;color:#777;white-space:nowrap}
+#sync.ok{color:var(--green)}#sync.wait{color:#c77700}#sync.err{color:var(--red)}
+main{padding:8px 12px 40px}
+button{font:inherit;font-size:14px;padding:6px 12px;border:1.5px solid var(--line);background:#fff;border-radius:8px;cursor:pointer;color:#111}
+button.pri{background:#111;color:#fff}
+button.on{background:var(--red);border-color:var(--red);color:#fff}
+button.danger{color:var(--red);border-color:var(--red)}
+input,textarea{font:inherit;color:#111}
+/* 列表 */
+.lh{display:flex;align-items:center;justify-content:space-between;margin:6px 0 12px}
+.lh h2{margin:0;font-size:20px}
+.mi{display:flex;align-items:center;gap:10px;border:1.5px solid #ddd;border-radius:10px;margin-bottom:8px;padding:0 10px 0 0}
+.mi a{flex:1;display:flex;flex-wrap:wrap;gap:4px 14px;padding:14px;color:#111;text-decoration:none;font-size:16px}
+.mi .sc{color:#666}
+.mi .x{font-size:13px;padding:4px 10px;color:#999;border-color:#ccc}
+.empty{color:#888;text-align:center;padding:40px 0}
+/* 比賽頁 */
+.top{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;font-size:16px;margin-bottom:6px}
+.top label{display:flex;align-items:center;gap:4px;white-space:nowrap}
+.top input{border:0;border-bottom:1.5px solid var(--line);width:120px;padding:2px 4px;background:transparent;border-radius:0}
+.top input.s{width:44px;text-align:center;font-weight:700}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.tab{padding:5px 12px;border:1.5px solid #bbb;border-radius:8px;color:#333;text-decoration:none;font-size:14px}
+.tab.on{background:#111;border-color:#111;color:#fff}
+.bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0 8px}
+.bar .tip{font-size:13px;color:var(--red);font-weight:600}
+.wrap{overflow:hidden}
+table{border-collapse:collapse;table-layout:fixed;width:1062px;font-size:13px;border:1.5px solid var(--line)}
+th,td{border:1px solid var(--line);text-align:center;padding:0;height:36px}
+th{background:var(--head);font-weight:500;height:24px;font-size:12px;line-height:1.15}
+tbody tr:nth-child(even) td{background:var(--alt)}
+td.b,th.b{background:var(--blue)!important}
+td.y,th.y{background:var(--yellow)!important}
+td.o,th.o{background:var(--orange)!important}
+td.c{cursor:pointer;user-select:none;-webkit-user-select:none;font-size:17px;font-weight:600;touch-action:manipulation}
+td.c:active{filter:brightness(.82)}
+.minus table{outline:3px solid var(--red)}
+.minus td.c:active{background:#f8b4b4!important}
+td.t,td.n{font-weight:700;font-size:16px;color:#444}
+tr.tot td{background:#e2e2e2!important;font-weight:700;font-size:15px;height:30px}
+td input{width:100%;height:100%;border:0;background:transparent;text-align:center;font-size:14px;padding:0 2px;border-radius:0}
+td .del{padding:0 7px;font-size:15px;color:var(--red);border-color:var(--red);border-radius:50%}
+.foot{display:flex;flex-wrap:wrap;gap:8px 36px;margin:10px 0 6px;font-size:16px;align-items:center}
+.cnt{display:inline-flex;align-items:center;gap:8px}
+.cnt b{min-width:26px;text-align:center;font-size:20px}
+.cnt button{padding:1px 12px;font-size:18px}
+textarea{width:100%;height:64px;font-size:15px;border:1.5px solid var(--line);border-radius:8px;padding:6px 8px}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:20;padding:16px}
+#modal[hidden]{display:none}
+#modal .box{background:#fff;border-radius:12px;padding:18px;max-width:340px;width:100%}
+#modal p{margin:0 0 16px;font-size:16px}
+.mbtn{display:flex;justify-content:flex-end;gap:8px}
+</style>
+</head>
+<body>
+<header class="app"><a href="#/">🏐 排球記錄</a><span id="sync"></span></header>
+<main id="view"></main>
+<div id="modal" hidden><div class="box"><p id="mmsg"></p><div class="mbtn"><button id="mno">取消</button><button id="myes" class="danger">確定</button></div></div></div>
+
+<script>
+// ===== 同步設定 =====
+// 填入 Firebase Realtime Database 網址，所有開這個頁面的裝置就會即時同步。
+// 留空 = 資料只存在這台裝置。
+const DB_URL = 'https://vt-record-default-rtdb.firebaseio.com';
+const ROOT = 'vb';
+
+const COLS=['sv_w','sv_l','rc_2','rc_1','rc_0','rc_l','rc_t','at_n','at_s','at_d','at_t','at_o','at_ni','at_out','df_2','df_1','df_t','dl_s','dl_b','dl_c','dl_q','bk_w','bk_l'];
+const CLS={rc_2:'b',rc_1:'b',at_n:'y',df_2:'o',df_1:'o'};
+const CALC={rc_t:['rc_2','rc_1','rc_0','rc_l'],df_t:['df_2','df_1']};
+const CSV_HEAD=['背號','球員','發球得分','發球失分','好球2','修正1','失誤0','接發失分','接發總和','打幾顆','直線','斜線','吊球','Touch out','No in','Out','防守兩分','防守一分','防守總和','扣球','小球','Cover','嗆司','攔網得分','攔網失分','其他'];
+
+// ===== 資料層 =====
+const LS='vb_cache_v3', LQ='vb_queue_v3', remote=!!DB_URL;
+const jload=k=>{try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}};
+const jsave=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+let T=jload(LS)||{}, Q=remote?(jload(LQ)||[]):[], online=false, failed=false, busy=false, retry=0;
+
+const segs=p=>(Array.isArray(p)?p.map(String):String(p).split('/')).filter(Boolean);
+function get(p){let o=T;for(const s of segs(p)){if(o==null||typeof o!=='object')return undefined;o=o[s]}return o}
+function apply(p,v){
+  p=segs(p);
+  if(!p.length){T=(v&&typeof v==='object')?v:{};return}
+  let o=T;
+  for(let i=0;i<p.length-1;i++){if(!o[p[i]]||typeof o[p[i]]!=='object')o[p[i]]={};o=o[p[i]]}
+  const k=p[p.length-1];
+  if(v==null)delete o[k];else o[k]=typeof v==='object'?JSON.parse(JSON.stringify(v)):v;
+}
+const applyOp=o=>o.m==='INC'?apply(o.p,Math.max(0,(+get(o.p)||0)+o.d)):apply(o.p,o.v);
+
+function op(o){
+  applyOp(o);jsave(LS,T);
+  if(remote){
+    const last=Q[Q.length-1];
+    // 連續打字時，合併尚未送出的同欄位修改
+    if(o.m==='PUT'&&last&&last.m==='PUT'&&last.p===o.p&&!(busy&&Q.length===1))last.v=o.v;
+    else Q.push(o);
+    jsave(LQ,Q);flush();
+  }
+  render();
+}
+const put=(p,v)=>op({m:'PUT',p:segs(p).join('/'),v:v??null});
+function inc(p,d){if((+get(p)||0)+d<0)return false;op({m:'INC',p:segs(p).join('/'),d});return true}
+
+async function flush(){
+  if(busy||!Q.length)return;
+  busy=true;const o=Q[0];
+  const del=o.m==='PUT'&&o.v==null;
+  try{
+    const r=await fetch(`${DB_URL}/${ROOT}/${o.p}.json`,{method:del?'DELETE':'PUT',body:del?undefined:JSON.stringify(o.m==='INC'?{'.sv':{increment:o.d}}:o.v)});
+    if(!r.ok)throw new Error(r.status);
+    Q.shift();jsave(LQ,Q);failed=false;busy=false;showSync();flush();
+  }catch(e){
+    busy=false;failed=true;showSync();
+    clearTimeout(retry);retry=setTimeout(flush,3000);
+  }
+}
+if(remote){
+  const es=new EventSource(`${DB_URL}/${ROOT}.json`);
+  es.addEventListener('put',e=>{
+    const {path,data}=JSON.parse(e.data);apply(path,data);
+    if(!segs(path).length)Q.forEach(applyOp); // 整包載入後，補上還沒上傳的本機修改
+    jsave(LS,T);render();
+  });
+  es.addEventListener('patch',e=>{
+    const {path,data}=JSON.parse(e.data);
+    for(const k in data)apply(segs(path).concat(segs(k)),data[k]);
+    jsave(LS,T);render();
+  });
+  es.onopen=()=>{online=true;showSync();flush()};
+  es.onerror=()=>{online=false;showSync()};
+  addEventListener('online',flush);
+  flush();
+}
+function showSync(){
+  const s=document.getElementById('sync');
+  if(!remote){s.className='';s.textContent='本機模式（未開啟同步）';return}
+  if(!online||failed){s.className='err';s.textContent=`● 離線${Q.length?`，${Q.length} 筆待上傳`:''}`}
+  else if(Q.length){s.className='wait';s.textContent=`● 上傳中 (${Q.length})`}
+  else{s.className='ok';s.textContent='● 已同步'}
+}
+
+// ===== 畫面 =====
+const $=s=>document.querySelector(s);
+const view=$('#view');
+const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const today=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
+const setList=m=>Object.entries(m.sets||{}).sort((a,b)=>(a[1].n||0)-(b[1].n||0));
+const rowList=s=>Object.entries(s.rows||{}).sort((a,b)=>(a[1].o||0)-(b[1].o||0));
+let minus=false, edit=false, undo=[], lastKey='', raf=0;
+
+function render(){if(!raf)raf=requestAnimationFrame(()=>{raf=0;draw()})}
+function route(){return location.hash.replace(/^#\/?/,'').split('/')}
+function draw(){
+  const [a,mid,sid]=route();
+  const r=(a==='m'&&get(['matches',mid]))?matchView(mid,sid):listView();
+  if(r.key!==lastKey){view.innerHTML=r.html;lastKey=r.key;fit()}
+  fill();showSync();
+}
+// 只更新數字與文字，不重建格子（避免點擊中斷、輸入框跳掉）
+function fill(){
+  view.querySelectorAll('[data-p]').forEach(el=>{
+    const v=get(el.dataset.p);
+    if(el.tagName==='INPUT'||el.tagName==='TEXTAREA'){if(el!==document.activeElement&&el.value!==String(v??''))el.value=v??''}
+    else{const s=+v?String(v):(v&&isNaN(v)?String(v):(el.dataset.z!=null?'0':''));if(el.textContent!==s)el.textContent=s}
+  });
+  view.querySelectorAll('[data-sum]').forEach(el=>{
+    const n=el.dataset.sum.split(',').reduce((a,p)=>a+(+get(p)||0),0);
+    const s=n?String(n):(el.dataset.z!=null?'0':'');if(el.textContent!==s)el.textContent=s;
+  });
+}
+function fit(){
+  const t=view.querySelector('table');if(!t)return;
+  t.style.zoom=1;
+  t.style.zoom=Math.min(1.3,view.clientWidth/t.offsetWidth);
+}
+addEventListener('resize',fit);
+
+function listView(){
+  const ms=Object.entries(get('matches')||{}).sort((a,b)=>(b[1].date||'').localeCompare(a[1].date||'')||(b[1].created||0)-(a[1].created||0));
+  const items=ms.map(([id,m])=>`<div class="mi"><a href="#/m/${id}"><b>${esc(m.date)}</b><span>vs ${esc(m.opp)||'（未填對手）'}</span><span class="sc">${setList(m).map(([,s])=>`${esc(s.us)||0}:${esc(s.them)||0}`).join('、')}</span></a><button class="x" data-delm="${id}">刪除</button></div>`).join('');
+  const html=`<div class="lh"><h2>比賽列表</h2><button id="newm" class="pri">＋ 新增比賽</button></div>${items||'<p class="empty">還沒有比賽，按「新增比賽」開始記錄。</p>'}`;
+  return {key:'L'+html,html};
+}
+
+function thead(){
+  const g=(t,c='',a='')=>`<th class="${c}" ${a}>${t}</th>`,r2='rowspan=2';
+  return `<thead><tr>${g('背號','','rowspan=3')}${g('球員','','rowspan=3')}${g('發球','','colspan=2')}${g('接發球','','colspan=5')}${g('攻擊','','colspan=7')}${g('防守','','colspan=3')}${g('防守失分','','colspan=4')}${g('攔網','','colspan=2')}${g('其他','','rowspan=3')}</tr>
+  <tr>${g('得分','',r2)}${g('失分','',r2)}${g('好球2','b',r2)}${g('修正1','b',r2)}${g('失誤0','',r2)}${g('失分','',r2)}${g('總和','',r2)}${g('打幾顆','y',r2)}${g('得分','','colspan=4')}${g('No in','',r2)}${g('Out','',r2)}${g('兩分','o',r2)}${g('一分','o',r2)}${g('總和','',r2)}${g('扣球','',r2)}${g('小球','',r2)}${g('Cover','',r2)}${g('嗆司','',r2)}${g('得分','',r2)}${g('失分','',r2)}</tr>
+  <tr>${g('直線')}${g('斜線')}${g('吊球')}${g('Touch<br>out')}</tr></thead>`;
+}
+const colgroup=`<colgroup><col style="width:38px"><col style="width:70px">${'<col style="width:38px">'.repeat(23)}<col style="width:80px"></colgroup>`;
+
+function matchView(mid,sid){
+  const M=`matches/${mid}`, m=get(M), sets=setList(m), all=sid==='all';
+  if(!all&&!(m.sets||{})[sid])sid=sets.length?sets[sets.length-1][0]:'';
+  const tabs=sets.map(([id,s])=>`<a class="tab ${id===sid?'on':''}" href="#/m/${mid}/${id}">第${s.n}局</a>`).join('')
+    +`<button id="newset">＋ 新局</button><a class="tab ${all?'on':''}" href="#/m/${mid}/all">全場合計</a>`;
+  let top=`<label>比賽對手：<input data-p="${M}/opp"></label><label>日期：<input type="date" data-p="${M}/date" style="width:150px"></label>`;
+  let body='',bar='',foot='',rowsP=[];
+  if(all){
+    // 以球員 id 合併各局（新局會沿用上一局的球員 id）
+    const info={},order=[];
+    sets.forEach(([s,set])=>rowList(set).forEach(([rid])=>{if(!info[rid]){info[rid]=[];order.push(rid)}info[rid].push(`${M}/sets/${s}/rows/${rid}`)}));
+    rowsP=order.map(rid=>info[rid]);
+    body=rowsP.map(ps=>{const P=ps[ps.length-1];
+      return `<tr><td data-p="${P}/num"></td><td data-p="${P}/name"></td>${COLS.map(k=>`<td class="n ${CLS[k]||''}" data-sum="${ps.flatMap(p=>(CALC[k]||[k]).map(x=>`${p}/v/${x}`)).join(',')}"></td>`).join('')}<td></td></tr>`}).join('');
+    rowsP=rowsP.flat();
+    top+=`<span><b>局數</b> ${sets.map(([,s])=>`${esc(s.us)||0}:${esc(s.them)||0}`).join('、')}</span>`;
+    const sp=k=>sets.map(([s])=>`${M}/sets/${s}/${k}`).join(',');
+    foot=`<div class="foot"><span class="cnt">舉球失誤：<b data-z data-sum="${sp('setErr')}"></b></span><span class="cnt">對方失誤：<b data-z data-sum="${sp('oppErr')}"></b></span></div>`;
+    bar=`<button id="csv">匯出 CSV</button>`;
+  }else{
+    const S=`${M}/sets/${sid}`, rows=rowList(m.sets[sid]);
+    top+=`<span>第 <b>${m.sets[sid].n}</b> 局</span><label><b>比數</b>　我們<input class="s" inputmode="numeric" data-p="${S}/us"> : <input class="s" inputmode="numeric" data-p="${S}/them">對手</label>`;
+    body=rows.map(([rid])=>{const P=`${S}/rows/${rid}`;rowsP.push(P);
+      return `<tr><td>${edit?`<button class="del" data-delr="${rid}">×</button>`:`<input inputmode="numeric" data-p="${P}/num">`}</td><td><input data-p="${P}/name"></td>${COLS.map(k=>CALC[k]?`<td class="t" data-sum="${CALC[k].map(x=>`${P}/v/${x}`).join(',')}"></td>`:`<td class="c ${CLS[k]||''}" data-p="${P}/v/${k}"></td>`).join('')}<td><input data-p="${P}/other"></td></tr>`}).join('');
+    bar=`<button id="mode" class="${minus?'on':''}">${minus?'點格子：−1':'點格子：+1'}</button><button id="undo">↶ 復原上一步</button><button id="edit" class="${edit?'on':''}">${edit?'完成編輯':'編輯球員'}</button>${edit?'<button id="addrow">＋ 新增球員</button>':''}<button id="csv">匯出 CSV</button><button id="delset" class="danger">刪除此局</button>${minus?'<span class="tip">扣分模式中：點格子會 −1，改完記得切回 +1</span>':''}`;
+    foot=`<div class="foot"><span class="cnt">舉球失誤：<button data-inc="${S}/setErr" data-d="-1">−</button><b data-z data-p="${S}/setErr"></b><button data-inc="${S}/setErr" data-d="1">＋</button></span><span class="cnt">對方失誤：<button data-inc="${S}/oppErr" data-d="-1">−</button><b data-z data-p="${S}/oppErr"></b><button data-inc="${S}/oppErr" data-d="1">＋</button></span></div><textarea placeholder="Note：" data-p="${S}/note"></textarea>`;
+  }
+  const tot=`<tr class="tot"><td colspan="2">合計</td>${COLS.map(k=>`<td data-sum="${rowsP.flatMap(p=>(CALC[k]||[k]).map(x=>`${p}/v/${x}`)).join(',')}"></td>`).join('')}<td></td></tr>`;
+  const html=`<div class="top">${top}</div><div class="tabs">${tabs}</div><div class="bar">${bar}</div><div class="wrap ${minus&&!all?'minus':''}"><table>${colgroup}${thead()}<tbody>${body}${tot}</tbody></table></div>${foot}`;
+  return {key:html,html,sid};
+}
+
+// ===== 操作 =====
+function ask(msg,yes='刪除'){
+  return new Promise(res=>{
+    $('#mmsg').textContent=msg;$('#myes').textContent=yes;$('#modal').hidden=false;
+    const done=v=>{$('#modal').hidden=true;res(v)};
+    $('#myes').onclick=()=>done(true);$('#mno').onclick=()=>done(false);
+  });
+}
+function cur(){const [,mid,sid]=route();const m=get(['matches',mid]);if(!m)return {};const sets=setList(m);
+  const s=(m.sets||{})[sid]?sid:(sid==='all'?'all':(sets.length?sets[sets.length-1][0]:''));return {mid,sid:s,m,sets}}
+function copyRows(set){const rows={};rowList(set||{}).forEach(([rid,r],i)=>rows[rid]={o:i,num:r.num||'',name:r.name||''});return rows}
+
+view.addEventListener('click',async e=>{
+  const t=e.target, c=t.closest('td.c');
+  if(c){const d=minus?-1:1;if(inc(c.dataset.p,d)){undo.push([c.dataset.p,d]);navigator.vibrate?.(8)}return}
+  if(t.dataset.inc){inc(t.dataset.inc,+t.dataset.d);return}
+  const {mid,sid,m,sets}=cur();
+  switch(t.id){
+    case 'newm':{
+      const id=uid(),s=uid(),last=Object.values(get('matches')||{}).sort((a,b)=>(b.created||0)-(a.created||0))[0];
+      let rows=last?copyRows(setList(last).pop()?.[1]):{};
+      if(!Object.keys(rows).length)for(let i=0;i<12;i++)rows[uid()+i]={o:i,num:'',name:''};
+      put(`matches/${id}`,{opp:'',date:today(),created:Date.now(),sets:{[s]:{n:1,us:'',them:'',setErr:0,oppErr:0,note:'',rows}}});
+      location.hash=`#/m/${id}/${s}`;return}
+    case 'newset':{
+      const s=uid(),src=(m.sets||{})[sid]||(sets.length?sets[sets.length-1][1]:null);
+      put(`matches/${mid}/sets/${s}`,{n:(sets.length?Math.max(...sets.map(x=>x[1].n||0)):0)+1,us:'',them:'',setErr:0,oppErr:0,note:'',rows:copyRows(src)});
+      location.hash=`#/m/${mid}/${s}`;return}
+    case 'delset':
+      if(await ask(`確定刪除第 ${m.sets[sid].n} 局的所有紀錄？`)){put(`matches/${mid}/sets/${sid}`,null);location.hash=`#/m/${mid}`}return;
+    case 'mode':minus=!minus;render();return;
+    case 'edit':edit=!edit;render();return;
+    case 'undo':{const u=undo.pop();if(u)inc(u[0],-u[1]);return}
+    case 'addrow':{const rows=rowList(m.sets[sid]);put(`matches/${mid}/sets/${sid}/rows/${uid()}`,{o:rows.length?(rows[rows.length-1][1].o||0)+1:0,num:'',name:''});return}
+    case 'csv':return exportCsv(m,sid);
+  }
+  if(t.dataset.delm){const x=get(['matches',t.dataset.delm]);if(await ask(`確定刪除 ${x.date||''} vs ${x.opp||'（未填對手）'} 這場比賽？`))put(`matches/${t.dataset.delm}`,null);return}
+  if(t.dataset.delr){const r=m.sets[sid].rows[t.dataset.delr];if(await ask(`確定刪除 ${r.num||''} ${r.name||'這位球員'} 這一列？`))put(`matches/${mid}/sets/${sid}/rows/${t.dataset.delr}`,null)}
+});
+view.addEventListener('input',e=>{const p=e.target.dataset.p;if(p)put(p,e.target.value)});
+
+function exportCsv(m,sid){
+  const rows=[...view.querySelectorAll('tbody tr')].map(tr=>[...tr.children].flatMap(td=>{
+    const i=td.querySelector('input');const v=i?i.value:td.textContent;return td.colSpan>1?[v,'']:[v]}));
+  const label=sid==='all'?'全場':`第${m.sets[sid].n}局`;
+  const meta=[['對手',m.opp||''],['日期',m.date||''],['範圍',label]];
+  if(sid!=='all'){const s=m.sets[sid];meta.push(['比數(我:對)',`${s.us||0}:${s.them||0}`],['舉球失誤',s.setErr||0],['對方失誤',s.oppErr||0],['Note',s.note||''])}
+  const csv=[...meta,[],CSV_HEAD,...rows].map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv'}));
+  a.download=`排球_${m.date||''}_${m.opp||''}_${label}.csv`;a.click();
+}
+
+addEventListener('hashchange',()=>{lastKey='';undo=[];edit=false;render()});
+render();
+</script>
+</body>
+</html>
